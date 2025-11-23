@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CornViT - Multi-Stage Corn Kernel Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌽 CornViT</h1>
+            <p class="subtitle">Multi-Stage Convolutional Vision Transformer Framework</p>
+            <p class="description">Hierarchical corn kernel analysis: Purity → Shape → Embryo Orientation</p>
+        </header>
+
+        <div class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📷</div>
+                <p>Click to upload or drag and drop</p>
+                <p class="file-info">Supports: JPG, PNG, JPEG (Max 16MB)</p>
+                <input type="file" id="fileInput" accept="image/*" hidden>
+            </div>
+
+            <div id="imagePreview" class="image-preview" style="display: none;">
+                <img id="previewImg" src="" alt="Preview">
+                <button class="btn-clear" onclick="clearImage()">✕ Clear</button>
+            </div>
+
+            <button id="analyzeBtn" class="btn-primary" disabled>Analyze Corn Image</button>
+        </div>
+
+        <div id="loadingSection" class="loading-section" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing corn kernel...</p>
+        </div>
+
+        <div id="resultsSection" class="results-section" style="display: none;">
+            <h2>Analysis Results</h2>
+            
+            <!-- Stage 1: Purity -->
+            <div class="stage-card" id="stage1Card">
+                <div class="stage-header">
+                    <h3>Stage 1: Purity Classification</h3>
+                    <span class="stage-badge" id="stage1Badge">✓</span>
+                </div>
+                <div class="stage-content" id="stage1Content"></div>
+            </div>
+
+            <!-- Stage 2: Shape -->
+            <div class="stage-card" id="stage2Card">
+                <div class="stage-header">
+                    <h3>Stage 2: Shape Classification</h3>
+                    <span class="stage-badge" id="stage2Badge"></span>
+                </div>
+                <div class="stage-content" id="stage2Content"></div>
+            </div>
+
+            <!-- Stage 3: Embryo Orientation -->
+            <div class="stage-card" id="stage3Card">
+                <div class="stage-header">
+                    <h3>Stage 3: Embryo Orientation</h3>
+                    <span class="stage-badge" id="stage3Badge"></span>
+                </div>
+                <div class="stage-content" id="stage3Content"></div>
+            </div>
+
+            <button class="btn-secondary" onclick="resetAnalysis()">Analyze Another Image</button>
+        </div>
+
+        <footer>
+            <p>CornViT Framework - Powered by CvT-13 Vision Transformer</p>
+        </footer>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loadingSection = document.getElementById('loadingSection');
+        const resultsSection = document.getElementById('resultsSection');
+
+        // Click to upload
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // File selection
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload an image file');
+                return;
+            }
+
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                uploadArea.style.display = 'none';
+                imagePreview.style.display = 'block';
+                analyzeBtn.disabled = false;
+                resultsSection.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage() {
+            selectedFile = null;
+            fileInput.value = '';
+            uploadArea.style.display = 'flex';
+            imagePreview.style.display = 'none';
+            analyzeBtn.disabled = true;
+            resultsSection.style.display = 'none';
+        }
+
+        function resetAnalysis() {
+            clearImage();
+            loadingSection.style.display = 'none';
+        }
+
+        // Analyze button
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            loadingSection.style.display = 'block';
+            resultsSection.style.display = 'none';
+            analyzeBtn.disabled = true;
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data.results);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error connecting to server: ' + error.message);
+            } finally {
+                loadingSection.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        function displayResults(results) {
+            // Stage 1
+            displayStage('stage1', results.stage1);
+            
+            // Stage 2
+            displayStage('stage2', results.stage2);
+            
+            // Stage 3
+            displayStage('stage3', results.stage3);
+
+            resultsSection.style.display = 'block';
+        }
+
+        function displayStage(stageId, stageData) {
+            const card = document.getElementById(stageId + 'Card');
+            const badge = document.getElementById(stageId + 'Badge');
+            const content = document.getElementById(stageId + 'Content');
+
+            if (stageData.executed) {
+                card.classList.add('executed');
+                badge.textContent = '✓';
+                badge.className = 'stage-badge success';
+
+                const result = stageData.result;
+                content.innerHTML = `
+                    <div class="result-main">
+                        <div class="prediction-label">Prediction:</div>
+                        <div class="prediction-value ${result.prediction.toLowerCase().replace(' ', '-')}">${result.prediction}</div>
+                        <div class="confidence-label">Confidence:</div>
+                        <div class="confidence-value">${(result.confidence * 100).toFixed(2)}%</div>
+                    </div>
+                    <div class="probabilities">
+                        <h4>Class Probabilities</h4>
+                        ${Object.entries(result.probabilities).map(([cls, prob]) => `
+                            <div class="prob-row">
+                                <span class="prob-label">${cls}</span>
+                                <div class="prob-bar">
+                                    <div class="prob-fill" style="width: ${prob * 100}%"></div>
+                                </div>
+                                <span class="prob-value">${(prob * 100).toFixed(2)}%</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                card.classList.add('skipped');
+                badge.textContent = '⊘';
+                badge.className = 'stage-badge skipped';
+                content.innerHTML = `
+                    <div class="skipped-message">
+                        <p>${stageData.reason}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+
